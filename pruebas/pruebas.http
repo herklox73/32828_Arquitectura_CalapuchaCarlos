@@ -1,0 +1,133 @@
+### =========================================================
+### Pruebas RRHH SOA para la extension "REST Client" de VS Code
+### Haz clic en "Send Request" sobre cada peticion, EN ORDEN.
+### El token y los IDs se toman solos de las respuestas anteriores.
+### =========================================================
+
+@baseUrl = http://localhost:3000
+
+### Prueba 1: Gateway vivo
+GET {{baseUrl}}/health
+
+### Prueba 2: Login (obtener token JWT)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "usuario": "admin", "password": "1234" }
+
+###
+@token = {{login.response.body.token}}
+
+### Prueba 3: ERROR sin token (401)
+GET {{baseUrl}}/api/empleados
+
+### Prueba 3b: ERROR token invalido (401)
+GET {{baseUrl}}/api/empleados
+Authorization: Bearer token.falso.123
+
+### Prueba 4: Crear empleado (201)
+# @name empleado
+POST {{baseUrl}}/api/empleados
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cedula": "1712345678",
+  "nombre": "Ana",
+  "apellido": "Torres",
+  "cargo": "Desarrolladora Backend",
+  "departamento": "TI",
+  "salario_base": 1500
+}
+
+### Prueba 4b: ERROR dato faltante (400)
+POST {{baseUrl}}/api/empleados
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cedula": "1799999999", "nombre": "Luis", "apellido": "Mora" }
+
+### Prueba 5: Listar empleados
+GET {{baseUrl}}/api/empleados
+Authorization: Bearer {{token}}
+
+### Prueba 5b: Filtrar por departamento
+GET {{baseUrl}}/api/empleados?departamento=TI
+Authorization: Bearer {{token}}
+
+### Prueba 6: ERROR cedula duplicada (409)
+POST {{baseUrl}}/api/empleados
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cedula": "1712345678", "nombre": "Otro", "apellido": "Nombre", "cargo": "Dev", "departamento": "TI", "salario_base": 1000 }
+
+### Prueba 7: Calcular nomina (201) -> neto_a_pagar 1579.38
+POST {{baseUrl}}/api/nomina/calcular
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "empleado_id": 1,
+  "periodo": "2025-04",
+  "salario_base": 1500,
+  "horas_extra": 5,
+  "bono": 100,
+  "descuentos": 67.50
+}
+
+### Prueba 7b: ERROR periodo invalido (400)
+POST {{baseUrl}}/api/nomina/calcular
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "empleado_id": 1, "periodo": "2025-13", "salario_base": 1500 }
+
+### Historial de nomina del empleado 1
+GET {{baseUrl}}/api/nomina/1
+Authorization: Bearer {{token}}
+
+### Prueba 8: Publicar vacante (201)
+# @name vacante
+POST {{baseUrl}}/api/reclutamiento/vacantes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Backend Developer Node.js",
+  "descripcion": "Desarrollar APIs REST para el sistema de RRHH",
+  "requisitos": ["Node.js", "PostgreSQL", "Docker"],
+  "salario": 1800
+}
+
+### Prueba 9: Registrar candidato (201)
+# @name candidato
+POST {{baseUrl}}/api/reclutamiento/candidatos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nombre": "Carlos",
+  "apellido": "Perez",
+  "email": "carlos@email.com",
+  "vacante_id": "{{vacante.response.body._id}}"
+}
+
+### Prueba 10: Cambiar estado del candidato (200)
+PUT {{baseUrl}}/api/reclutamiento/candidatos/{{candidato.response.body._id}}/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "estado": "entrevista", "notas": "Perfil tecnico aprobado, agendar entrevista" }
+
+### Prueba 10b: ERROR estado invalido (400)
+PUT {{baseUrl}}/api/reclutamiento/candidatos/{{candidato.response.body._id}}/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "estado": "contratado" }
+
+### Listar candidatos
+GET {{baseUrl}}/api/reclutamiento/candidatos
+Authorization: Bearer {{token}}

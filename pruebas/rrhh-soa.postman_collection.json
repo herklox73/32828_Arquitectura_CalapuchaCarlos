@@ -1,0 +1,291 @@
+{
+  "info": {
+    "name": "RRHH SOA - Practica 2",
+    "description": "Pruebas del sistema de Gestion de RRHH con arquitectura SOA. Todas las peticiones pasan por el API Gateway (puerto 3000). Ejecutar primero '2. Login (admin)': el token se guarda solo en la variable {{token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "empleadoId", "value": "1" },
+    { "key": "vacanteId", "value": "" },
+    { "key": "candidatoId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Gateway y seguridad",
+      "item": [
+        {
+          "name": "1. Health check del Gateway",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('status = ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+          ] } }]
+        },
+        {
+          "name": "2. Login (admin) - guarda el token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin\",\n  \"password\": \"1234\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Devuelve token', () => pm.expect(body.token).to.be.a('string'));",
+            "pm.collectionVariables.set('token', body.token);"
+          ] } }]
+        },
+        {
+          "name": "2b. ERROR - Login con clave incorrecta",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin\",\n  \"password\": \"clave_mala\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ] } }]
+        },
+        {
+          "name": "3. ERROR - Peticion sin token",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/empleados" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));",
+            "pm.test('Token requerido', () => pm.expect(pm.response.json().error).to.eql('Token requerido'));"
+          ] } }]
+        },
+        {
+          "name": "3b. ERROR - Token invalido",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "token.falso.123", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/api/empleados"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "1. Servicio Empleados",
+      "item": [
+        {
+          "name": "4. Crear empleado",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cedula\": \"1712345678\",\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Torres\",\n  \"cargo\": \"Desarrolladora Backend\",\n  \"departamento\": \"TI\",\n  \"salario_base\": 1500\n}" },
+            "url": "{{baseUrl}}/api/empleados"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "if (pm.response.code === 201) pm.collectionVariables.set('empleadoId', pm.response.json().id);"
+          ] } }]
+        },
+        {
+          "name": "4b. ERROR - Dato faltante",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cedula\": \"1799999999\",\n  \"nombre\": \"Luis\",\n  \"apellido\": \"Mora\"\n}" },
+            "url": "{{baseUrl}}/api/empleados"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "5. Listar empleados",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/empleados" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "5b. Listar empleados filtrando por departamento",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/empleados?departamento=TI", "host": ["{{baseUrl}}"], "path": ["api", "empleados"], "query": [{ "key": "departamento", "value": "TI" }] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "6. ERROR - Cedula duplicada",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cedula\": \"1712345678\",\n  \"nombre\": \"Otro\",\n  \"apellido\": \"Nombre\",\n  \"cargo\": \"Dev\",\n  \"departamento\": \"TI\",\n  \"salario_base\": 1000\n}" },
+            "url": "{{baseUrl}}/api/empleados"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 409', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Obtener empleado por ID",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/empleados/{{empleadoId}}" }
+        },
+        {
+          "name": "Actualizar empleado",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cargo\": \"Tech Lead\"\n}" },
+            "url": "{{baseUrl}}/api/empleados/{{empleadoId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Servicio Nomina",
+      "item": [
+        {
+          "name": "7. Calcular nomina del empleado",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"empleado_id\": {{empleadoId}},\n  \"periodo\": \"2025-04\",\n  \"salario_base\": 1500,\n  \"horas_extra\": 5,\n  \"bono\": 100,\n  \"descuentos\": 67.50\n}" },
+            "url": "{{baseUrl}}/api/nomina/calcular"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Neto = 1579.38', () => pm.expect(pm.response.json().resumen.neto_a_pagar).to.eql(1579.38));"
+          ] } }]
+        },
+        {
+          "name": "7b. ERROR - Periodo con formato invalido",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"empleado_id\": {{empleadoId}},\n  \"periodo\": \"2025-13\",\n  \"salario_base\": 1500\n}" },
+            "url": "{{baseUrl}}/api/nomina/calcular"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "7c. ERROR - Nomina duplicada en el mismo periodo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"empleado_id\": {{empleadoId}},\n  \"periodo\": \"2025-04\",\n  \"salario_base\": 1500\n}" },
+            "url": "{{baseUrl}}/api/nomina/calcular"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 409', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Historial de nominas del empleado",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/nomina/{{empleadoId}}" }
+        },
+        {
+          "name": "Rol de pago de un periodo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/nomina/{{empleadoId}}/2025-04" }
+        }
+      ]
+    },
+    {
+      "name": "3. Servicio Reclutamiento",
+      "item": [
+        {
+          "name": "8. Publicar vacante - guarda vacanteId",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Backend Developer Node.js\",\n  \"descripcion\": \"Desarrollar APIs REST para el sistema de RRHH\",\n  \"requisitos\": [\"Node.js\", \"PostgreSQL\", \"Docker\"],\n  \"salario\": 1800\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/vacantes"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('vacanteId', pm.response.json()._id);"
+          ] } }]
+        },
+        {
+          "name": "8b. ERROR - Vacante sin titulo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"descripcion\": \"Vacante sin titulo\"\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/vacantes"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "Listar vacantes",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/reclutamiento/vacantes" }
+        },
+        {
+          "name": "9. Registrar candidato - guarda candidatoId",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carlos\",\n  \"apellido\": \"Perez\",\n  \"email\": \"carlos@email.com\",\n  \"vacante_id\": \"{{vacanteId}}\"\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/candidatos"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('candidatoId', pm.response.json()._id);"
+          ] } }]
+        },
+        {
+          "name": "9b. ERROR - Candidato con datos faltantes",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carlos\"\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/candidatos"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "10. Cambiar estado del candidato",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"entrevista\",\n  \"notas\": \"Perfil tecnico aprobado, agendar entrevista\"\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/candidatos/{{candidatoId}}/estado"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Estado = entrevista', () => pm.expect(pm.response.json().estado).to.eql('entrevista'));"
+          ] } }]
+        },
+        {
+          "name": "10b. ERROR - Estado invalido",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"contratado\"\n}" },
+            "url": "{{baseUrl}}/api/reclutamiento/candidatos/{{candidatoId}}/estado"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "Listar candidatos (con titulo de la vacante)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/reclutamiento/candidatos" }
+        }
+      ]
+    }
+  ]
+}
