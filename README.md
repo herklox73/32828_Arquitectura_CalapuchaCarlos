@@ -4,7 +4,6 @@ Práctica de laboratorio N° 2 — Arquitectura de Software (ESPE, período 2026
 
 Sistema de Recursos Humanos dividido en **tres servicios de negocio independientes** (Empleados, Nómina y Reclutamiento), cada uno con su propia base de datos, coordinados por un **API Gateway** que actúa como Bus de Servicios Empresariales (ESB): autenticación JWT, enrutamiento dinámico, logging centralizado y control de tasa de peticiones.
 
-![Arquitectura SOA](docs/arquitectura-soa.png)
 
 ## Componentes
 
